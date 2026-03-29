@@ -5,9 +5,13 @@ from datetime import datetime, timedelta, timezone
 from .providers.telegram import send_telegram_message
 import logging
 import os
+import asyncio
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+def sync_run_reports():
+    asyncio.run(run_reports())
 
 async def run_reports():
     """
@@ -16,10 +20,30 @@ async def run_reports():
     db: Session = SessionLocal()
     try:
         reports = db.query(ReportConfig).filter(ReportConfig.enabled == True).all()
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        last_24h = now - timedelta(hours=24)
+        
         for report in reports:
+            # Check schedule
+            if report.last_run:
+                schedule = str(report.schedule).strip().lower()
+                if schedule == "daily" and now - report.last_run < timedelta(days=1):
+                    continue
+                elif schedule == "hourly" and now - report.last_run < timedelta(hours=1):
+                    continue
+                elif "interval:" in schedule:
+                    try:
+                        minutes = int(schedule.split(":")[1])
+                        if now - report.last_run < timedelta(minutes=minutes):
+                            continue
+                    except:
+                        pass
+                elif now - report.last_run < timedelta(days=1):
+                    # Fallback for unrecognized crons/schedules, default to daily max 1 run
+                    continue
+            
             # Fetch latest data for summary
-            last_24h = datetime.now(timezone.utc) - timedelta(hours=24)
-            data = db.query(SpeedTestResult).filter(SpeedTestResult.timestamp >= last_24h.replace(tzinfo=None)).all()
+            data = db.query(SpeedTestResult).filter(SpeedTestResult.timestamp >= last_24h).all()
             
             if not data:
                 logger.info(f"No data for report: {report.name}")
@@ -47,7 +71,7 @@ async def run_reports():
                 
                 if bot_token:
                     await send_telegram_message(bot_token, report.recipient, message)
-                    report.last_run = datetime.now(timezone.utc).replace(tzinfo=None)
+                    report.last_run = now
                     db.commit()
                     logger.info(f"Report sent to Telegram: {report.name}")
                 else:

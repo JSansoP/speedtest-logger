@@ -63,6 +63,41 @@ def trigger_speedtest():
     thread.start()
     return jsonify({"message": "Speedtest started in background."})
 
+@app.route("/api/history/<int:id>", methods=["DELETE"])
+def delete_speedtest(id):
+    """
+    Delete a specific speedtest result
+    """
+    db: Session = SessionLocal()
+    try:
+        record = db.query(SpeedTestResult).filter(SpeedTestResult.id == id).first()
+        if record:
+            db.delete(record)
+            db.commit()
+            return jsonify({"message": f"Deleted record {id}"}), 200
+        return jsonify({"error": "Record not found"}), 404
+    except Exception as e:
+        logger.error(f"Error deleting record: {e}")
+        return jsonify({"error": str(e)}), 400
+    finally:
+        db.close()
+
+@app.route("/api/history/all", methods=["DELETE"])
+def delete_all_speedtests():
+    """
+    Delete all speedtest results
+    """
+    db: Session = SessionLocal()
+    try:
+        db.query(SpeedTestResult).delete()
+        db.commit()
+        return jsonify({"message": "All records deleted"}), 200
+    except Exception as e:
+        logger.error(f"Error deleting all records: {e}")
+        return jsonify({"error": str(e)}), 400
+    finally:
+        db.close()
+
 @app.route("/api/reports", methods=["GET"])
 def get_reports():
     """
@@ -126,6 +161,55 @@ def create_report():
         return jsonify({"message": "Report created"}), 201
     except Exception as e:
         logger.error(f"Error creating report: {e}")
+        return jsonify({"error": str(e)}), 400
+    finally:
+        db.close()
+
+@app.route("/api/reports/<int:id>", methods=["PUT"])
+def update_report(id):
+    """
+    Update an existing report configuration
+    """
+    data = request.json
+    db: Session = SessionLocal()
+    try:
+        report = db.query(ReportConfig).filter(ReportConfig.id == id).first()
+        if not report:
+            return jsonify({"error": "Report not found"}), 404
+            
+        if "name" in data: report.name = data["name"]
+        if "type" in data: report.type = data["type"]
+        if "schedule" in data: 
+            report.schedule = data["schedule"]
+            # Reset last_run so new schedule takes effect immediately
+            report.last_run = None
+        if "recipient" in data: report.recipient = data["recipient"]
+        if "enabled" in data: report.enabled = data["enabled"]
+        
+        db.commit()
+        return jsonify({"message": f"Report {id} updated"}), 200
+    except Exception as e:
+        logger.error(f"Error updating report: {e}")
+        return jsonify({"error": str(e)}), 400
+    finally:
+        db.close()
+
+@app.route("/api/reports/<int:id>", methods=["DELETE"])
+def delete_report(id):
+    """
+    Delete a report configuration
+    """
+    db: Session = SessionLocal()
+    try:
+        report = db.query(ReportConfig).filter(ReportConfig.id == id).first()
+        if not report:
+            return jsonify({"error": "Report not found"}), 404
+            
+        db.delete(report)
+        db.commit()
+        return jsonify({"message": f"Report {id} deleted"}), 200
+    except Exception as e:
+        logger.error(f"Error deleting report: {e}")
         return jsonify({"error": str(e)}), 400
     finally:
         db.close()

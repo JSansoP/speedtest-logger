@@ -3,6 +3,7 @@ from apscheduler.triggers.interval import IntervalTrigger
 from .worker import run_speedtest
 from backend.database import SessionLocal
 from backend.models import AppSettings
+from reporting.manager import sync_run_reports
 import logging
 import time
 from datetime import datetime
@@ -65,6 +66,16 @@ def start_scheduler():
         replace_existing=True,
         misfire_grace_time=30,
         next_run_time=datetime.now() # Run first time immediately
+    )
+    
+    # Check reports every minute
+    scheduler.add_job(
+        sync_run_reports,
+        IntervalTrigger(minutes=1),
+        id="reports_job",
+        replace_existing=True,
+        misfire_grace_time=30,
+        next_run_time=datetime.now() # Check first time immediately
     )
 
     scheduler.start()
