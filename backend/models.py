@@ -12,6 +12,8 @@ class SpeedTestResult(Base):
     ping = Column(Float)     # ms
     server_name = Column(String)
     server_id = Column(String)
+    advertised_download = Column(Float, nullable=True)  # Mbps - ISP promised speed at time of test
+    advertised_upload = Column(Float, nullable=True)     # Mbps - ISP promised speed at time of test
 
 class ReportConfig(Base):
     __tablename__ = "report_configs"
@@ -22,6 +24,7 @@ class ReportConfig(Base):
     schedule = Column(String) # Cron expression or 'interval:60' (minutes)
     recipient = Column(String) # e.g. chat_id for telegram
     template = Column(String) # Custom template or 'default'
+    data_window = Column(String, default="last_day") # last_day, last_week, last_month, last_3_months, last_6_months, last_year
     enabled = Column(Boolean, default=True)
     last_run = Column(DateTime, nullable=True)
 

@@ -18,6 +18,7 @@ logger = logging.getLogger("API")
 # Ensure tables are created
 Base.metadata.create_all(bind=engine)
 
+
 @app.route("/api/speedtests", methods=["GET"])
 def get_speedtests():
     """
@@ -44,7 +45,9 @@ def get_speedtests():
                 "download": r.download,
                 "upload": r.upload,
                 "ping": r.ping,
-                "server_name": r.server_name
+                "server_name": r.server_name,
+                "advertised_download": r.advertised_download,
+                "advertised_upload": r.advertised_upload
             } for r in results
         ])
     finally:
@@ -117,6 +120,7 @@ def get_reports():
                 "type": r.type,
                 "schedule": r.schedule,
                 "recipient": r.recipient,
+                "data_window": r.data_window or "last_day",
                 "enabled": r.enabled,
                 "last_run": r.last_run.isoformat() if r.last_run else None
             } for r in reports
@@ -153,6 +157,7 @@ def create_report():
             type=data.get("type", "telegram"),
             schedule=data["schedule"],
             recipient=data["recipient"],
+            data_window=data.get("data_window", "last_day"),
             enabled=data.get("enabled", True)
         )
         db.add(new_report)
@@ -184,6 +189,7 @@ def update_report(id):
             # Reset last_run so new schedule takes effect immediately
             report.last_run = None
         if "recipient" in data: report.recipient = data["recipient"]
+        if "data_window" in data: report.data_window = data["data_window"]
         if "enabled" in data: report.enabled = data["enabled"]
         
         db.commit()

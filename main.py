@@ -5,7 +5,7 @@ import logging
 import time
 from backend.api import app as flask_app
 from collector.scheduler import start_scheduler
-from backend.database import engine, Base
+from backend.database import engine, Base, run_migrations
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -21,6 +21,8 @@ def main():
     # Ensure database tables are created
     logger.info("Initializing database...")
     Base.metadata.create_all(bind=engine)
+    run_migrations()
+    logger.info("Database migrations complete.")
     
     # Start Scheduler in background
     logger.info("Starting Scheduler...")
