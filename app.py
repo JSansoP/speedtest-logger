@@ -139,7 +139,7 @@ with tabs[3]:
         
     speedtest_interval = st.number_input(
         "Speedtest Interval (minutes)", 
-        min_value=5, 
+        min_value=1, 
         value=int(current_settings.get("speedtest_interval", 60))
     )
     

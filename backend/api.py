@@ -4,7 +4,7 @@ from flasgger import Swagger
 from .database import SessionLocal, engine
 from .models import SpeedTestResult, ReportConfig, AppSettings, Base
 from collector.worker import run_speedtest
-from collector.scheduler import update_speedtest_interval
+from collector.scheduler import update_speedtest_interval, scheduler
 import threading
 import logging
 import os
@@ -13,7 +13,7 @@ app = Flask(__name__)
 swagger = Swagger(app)
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("API")
 
 # Ensure tables are created
 Base.metadata.create_all(bind=engine)
@@ -203,6 +203,25 @@ def update_settings():
         return jsonify({"error": str(e)}), 400
     finally:
         db.close()
+
+@app.route("/api/debug/scheduler", methods=["GET"])
+def debug_scheduler():
+    """
+    Inspect the background scheduler jobs
+    ---
+    responses:
+      200:
+        description: State of current jobs
+    """
+    jobs = scheduler.get_jobs()
+    return jsonify([
+        {
+            "id": j.id,
+            "next_run_time": j.next_run_time.isoformat() if j.next_run_time else None,
+            "trigger": str(j.trigger),
+            "pending": j.pending
+        } for j in jobs
+    ])
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
