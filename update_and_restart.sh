@@ -1,19 +1,20 @@
 #!/bin/bash
-
-echo "Stopping and removing existing containers..."
-# Bring down the docker containers (will not fail if they are not up)
-docker compose down || true
+set -e
 
 echo "Pulling latest changes from git..."
-# Pull the latest code from git
-# git pull
+git pull || true
 
-echo "Building and starting containers..."
-# Build and start the containers in detached mode
-docker compose up -d --build
+echo "Pulling pre-built docker image..."
+docker compose pull || true
+
+echo "Stopping existing containers..."
+docker compose down || true
+
+echo "Starting containers..."
+docker compose up -d
 
 echo "Pruning old docker images..."
-# Prune old dangling docker images
 docker image prune -f
 
-echo "Done!"
+echo "Done! Speedtest Logger is running."
+
