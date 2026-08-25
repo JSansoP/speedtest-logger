@@ -6,7 +6,7 @@ A fully containerized, automated internet performance monitor with a modern dash
 
 ## ✨ Features
 
-- **Automated Monitoring**: Scheduled speedtests (from 1 minute to any interval) using `adv-speedtest-cli`.
+- **Automated Monitoring**: Scheduled speedtests (from 1 minute to any interval) using `fast-cli` (Fast.com powered by Netflix).
 - **Modern Dashboard**: Dynamic, interactive charts built with **Streamlit** and **Plotly** (Dark Mode included).
 - **Professional Reporting**: Modular reporting system with built-in **Telegram** notifications for 24-hour summaries.
 - **Dynamic Configuration**: Change your test intervals directly from the web UI without restarting containers.
