@@ -2,7 +2,11 @@
 set -e
 
 echo "Pulling latest changes from git..."
-git pull || true
+if [ -n "$SUDO_USER" ]; then
+    sudo -u "$SUDO_USER" git pull || true
+else
+    git pull || true
+fi
 
 echo "Pulling pre-built docker image..."
 docker compose pull || true
