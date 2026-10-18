@@ -170,3 +170,16 @@ def test_settings_saves_values(client):
     assert response.status_code == 200
     body = client.get("/api/settings").get_json()
     assert float(body["advertised_download"]) == 600
+
+
+def test_frontend_uses_relative_urls(client):
+    html = client.get("/").get_data(as_text=True)
+    assert 'src="/' not in html
+    assert 'href="/' not in html
+    assert 'src="static/app.js"' in html
+
+
+def test_api_docs_honor_forwarded_prefix(client):
+    response = client.get("/apidocs/", headers={"X-Forwarded-Prefix": "/speedtest"})
+    assert response.status_code == 200
+    assert "/speedtest/apispec_1.json" in response.get_data(as_text=True)

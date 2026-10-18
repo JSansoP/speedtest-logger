@@ -60,6 +60,15 @@ Access the dashboard at:
 - **Reports**: Set up your Telegram notifications.
 - **Settings**: Adjust the test frequency (default 60 min).
 
+### Serving under a subpath (e.g. `http://pi-nas/speedtest/`)
+The UI uses relative URLs and honors `X-Forwarded-Prefix`, so it can sit behind a reverse proxy at any path.
+For openMediaVault, copy the included nginx snippet into OMV's custom include folder:
+```bash
+sudo cp deploy/nginx/speedtest.conf /etc/nginx/openmediavault-webgui.d/
+sudo nginx -t && sudo systemctl reload nginx
+```
+OMV regenerates its own nginx config but keeps files in that folder.
+
 ### 🔌 API Documentation (Swagger)
 For developers or integration:  
 👉 [**http://localhost:5000/apidocs**](http://localhost:5000/apidocs)

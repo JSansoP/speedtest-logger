@@ -1,4 +1,4 @@
-const API = "/api";
+const API = "api";
 
 const RANGES = [
   { key: "24h", label: "24 h", long: "last 24 hours", days: 1 },
@@ -1085,7 +1085,7 @@ async function renderSettings(isCurrent) {
           <div><h2>Data</h2><p>${total} ${total === 1 ? "test" : "tests"} recorded.</p></div>
           <div class="settings-fields">
             <div class="button-row">
-              <a class="button" href="/apidocs" target="_blank" rel="noopener">Open API docs</a>
+              <a class="button" href="apidocs/" target="_blank" rel="noopener">Open API docs</a>
               <button class="button danger" type="button" data-action="delete-all" ${total ? "" : "disabled"}>Delete all results</button>
             </div>
           </div>

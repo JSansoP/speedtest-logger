@@ -9,6 +9,7 @@ from flask import Flask, jsonify, request, send_from_directory
 from sqlalchemy import func
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 from collector.scheduler import scheduler, update_speedtest_interval
 from collector.worker import is_running, start_background_run
@@ -20,6 +21,7 @@ FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
 DATA_WINDOWS = {"last_day", "last_week", "last_month", "last_3_months", "last_6_months", "last_year"}
 
 app = Flask(__name__, static_folder=None)
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
 swagger = Swagger(app)
 
 logging.basicConfig(level=logging.INFO)
