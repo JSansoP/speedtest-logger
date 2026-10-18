@@ -20,12 +20,14 @@ docker compose up -d --remove-orphans
 echo "Removing old Speedtest Logger images..."
 IMAGE_REPO="${IMAGE_REPO:-ghcr.io/jsansop/speedtest-logger}"
 IMAGE_LABEL="${IMAGE_LABEL:-org.opencontainers.image.source=https://github.com/JSansoP/speedtest-logger}"
+COMPOSE_LABEL="${COMPOSE_LABEL:-com.docker.compose.project=speedtest-logger}"
 CURRENT_IMAGE=$(docker image inspect --format '{{.Id}}' "$IMAGE_REPO:latest" 2>/dev/null || true)
 if [ -n "$CURRENT_IMAGE" ]; then
     OLD_IMAGES=$(
         {
             docker images --no-trunc --quiet --filter "reference=$IMAGE_REPO"
             docker images --no-trunc --quiet --filter "label=$IMAGE_LABEL"
+            docker images --no-trunc --quiet --filter "label=$COMPOSE_LABEL"
         } | sort -u | grep -vxF "$CURRENT_IMAGE" || true
     )
     for image in $OLD_IMAGES; do
