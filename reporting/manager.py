@@ -8,8 +8,9 @@ from sqlalchemy.orm import Session
 
 from backend.database import SessionLocal
 from backend.models import ReportConfig, SpeedTestResult
+from collector.latency import outage_stats, window_stats
 
-from .alerts import resolve_bot_token
+from .alerts import escape_markdown, resolve_bot_token
 from .providers.telegram import send_telegram_message
 
 logging.basicConfig(level=logging.INFO)
@@ -34,6 +35,25 @@ DATA_WINDOW_LABELS = {
     "last_6_months": "Last 6 Months",
     "last_year": "Last Year",
 }
+
+def build_latency_section(db: Session, since: datetime, now: datetime) -> str:
+    """Per target latency and loss plus outage totals for the report window."""
+    stats = window_stats(db, since, now)
+    if not stats:
+        return ""
+    lines = ["\n\nLatency and loss"]
+    for item in stats:
+        median = f"{item['median_ms']:.1f} ms" if item["median_ms"] is not None else "n/a"
+        p95 = f"{item['p95_ms']:.1f} ms" if item["p95_ms"] is not None else "n/a"
+        loss = f"{item['loss_pct']:.2f}%" if item["loss_pct"] is not None else "n/a"
+        lines.append(f"  {escape_markdown(item['name'])}: Med {median}  ·  P95 {p95}  ·  Loss {loss}")
+    outages, downtime = outage_stats(db, since, now)
+    if outages:
+        lines.append(f"  Outages: {outages}  ·  Total downtime: {round(downtime.total_seconds() / 60)} min")
+    else:
+        lines.append("  Outages: none")
+    return "\n".join(lines)
+
 
 def sync_run_reports():
     asyncio.run(run_reports())
@@ -123,6 +143,10 @@ async def run_reports():
                 f"  Avg: {avg_ping:.1f}  ·  Med: {med_ping:.1f}\n"
                 f"  Std: {std_ping:.1f}  ·  Min: {min_ping:.1f}  ·  Max: {max_ping:.1f}"
             )
+            loaded = [d.loaded_latency for d in data if d.loaded_latency is not None]
+            if loaded:
+                message += f"\n  Under load: Med: {statistics.median(loaded):.1f}  ·  Max: {max(loaded):.1f}"
+            message += build_latency_section(db, cutoff, now)
             
             if report.type == "telegram":
                 # Priority: 1. Environment Variable, 2. Database
