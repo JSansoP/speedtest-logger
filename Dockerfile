@@ -1,6 +1,8 @@
 # Use the official lightweight Python image
 FROM python:3.14-slim
 
+LABEL org.opencontainers.image.source=https://github.com/JSansoP/speedtest-logger
+
 # Install system dependencies, Chromium, and Node.js 20 for fast-cli (Puppeteer-based)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
