@@ -32,6 +32,8 @@ Python 3.14, uv, Flask + SQLAlchemy (SQLite), APScheduler, flasgger (Swagger at 
 - `/api/latency/summary` is read by the home-dashboard `latency` adapter (`targets[].state`, `targets[].median_ms`, `diagnosis.text`). Keep that shape stable.
 - `/api/latency` returns columns of equal length with epoch-second `t`; raw samples up to 7 days, hourly rollups beyond, and reports the resolution used.
 
+- Every page's top bar starts with a `.home-link` back to `http://personal-vps/home/` (absolute URL, because this UI is served from a different host than some of the other dashboards). Keep it when editing the top bar.
+
 ## Deployment
 
 Docker Compose service `backend` (container `speedtest-backend`, bridge network, port 5000, image `ghcr.io/jsansop/speedtest-logger:latest`, data volume `/app/data`) on the Pi (`sanso@pi-nas`). GitHub Actions builds the image on push to main; `update_and_restart.sh` pulls and restarts it. Served at `http://pi-nas/speedtest/` through OMV nginx (`deploy/nginx/speedtest.conf`, `X-Forwarded-Prefix` with `ProxyFix`); the UI uses relative URLs.
