@@ -1,13 +1,16 @@
-from sqlalchemy.orm import Session
-from backend.database import SessionLocal
-from backend.models import ReportConfig, SpeedTestResult, AppSettings
-from datetime import datetime, timedelta, timezone
-from croniter import croniter
-from .providers.telegram import send_telegram_message
+import asyncio
 import logging
 import os
-import asyncio
 import statistics
+from datetime import UTC, datetime, timedelta
+
+from croniter import croniter
+from sqlalchemy.orm import Session
+
+from backend.database import SessionLocal
+from backend.models import AppSettings, ReportConfig, SpeedTestResult
+
+from .providers.telegram import send_telegram_message
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -42,7 +45,7 @@ async def run_reports():
     db: Session = SessionLocal()
     try:
         reports = db.query(ReportConfig).filter(ReportConfig.enabled == True).all()
-        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        now = datetime.now(UTC).replace(tzinfo=None)
         
         for report in reports:
             # Check schedule using cron expression

@@ -52,8 +52,8 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 # Create a data directory for the SQLite database
 RUN mkdir -p /app/data
 
-# Expose ports for Flask (5000) and Streamlit (8501)
-EXPOSE 5000 8501
+# Expose the Flask port (API and web UI)
+EXPOSE 5000
 
 # The default command will be overridden by docker-compose for each service
 CMD ["uv", "run", "python", "main.py"]

@@ -1,11 +1,11 @@
-import threading
-import os
-import sys
 import logging
+import sys
+import threading
 import time
+
 from backend.api import app as flask_app
+from backend.database import Base, engine, run_migrations
 from collector.scheduler import start_scheduler
-from backend.database import engine, Base, run_migrations
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -33,9 +33,7 @@ def main():
     flask_thread.start()
     
     logger.info("Speedtest Logger core services are running.")
-    logger.info("Instructions:")
-    logger.info("1. API is running on http://localhost:5000")
-    logger.info("2. To start the dashboard, run: uv run streamlit run app.py")
+    logger.info("Dashboard and API available on http://localhost:5000")
     
     try:
         # Keep main thread alive

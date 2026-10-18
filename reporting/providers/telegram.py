@@ -1,6 +1,6 @@
-from telegram import Bot
-import asyncio
 import logging
+
+from telegram import Bot
 
 logger = logging.getLogger(__name__)
 

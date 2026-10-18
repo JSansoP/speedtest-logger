@@ -1,12 +1,15 @@
-from apscheduler.schedulers.background import BackgroundScheduler
-from apscheduler.triggers.interval import IntervalTrigger
-from .worker import run_speedtest
-from backend.database import SessionLocal
-from backend.models import AppSettings
-from reporting.manager import sync_run_reports
 import logging
 import time
 from datetime import datetime
+
+from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.triggers.interval import IntervalTrigger
+
+from backend.database import SessionLocal
+from backend.models import AppSettings
+from reporting.manager import sync_run_reports
+
+from .worker import run_speedtest
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("Scheduler")

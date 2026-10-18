@@ -13,18 +13,5 @@ services:
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
     restart: unless-stopped
 
-  frontend:
-    image: ghcr.io/jsansop/speedtest-logger:latest
-    build: .
-    container_name: speedtest-frontend
-    command: ["uv", "run", "streamlit", "run", "app.py", "--server.port", "8501", "--server.address", "0.0.0.0"]
-    ports:
-      - "8501:8501"
-    environment:
-      - API_URL=http://backend:5000/api
-    depends_on:
-      - backend
-    restart: unless-stopped
-
 volumes:
   speedtest_data:

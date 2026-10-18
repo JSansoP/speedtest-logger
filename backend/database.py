@@ -1,11 +1,11 @@
-from sqlalchemy import create_engine, text, inspect
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
 import os
 
-DATA_DIR = "/app/data"
-if not os.path.exists(DATA_DIR):
-    os.makedirs(DATA_DIR)
+from sqlalchemy import create_engine, inspect, text
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker
+
+DATA_DIR = os.getenv("DATA_DIR", "/app/data")
+os.makedirs(DATA_DIR, exist_ok=True)
 
 DATABASE_URL = f"sqlite:///{DATA_DIR}/speedtest.db"
 

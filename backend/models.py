@@ -1,6 +1,9 @@
-from sqlalchemy import Column, Integer, Float, String, DateTime, Boolean
-from .database import Base
 from datetime import datetime
+
+from sqlalchemy import Boolean, Column, DateTime, Float, Integer, String
+
+from .database import Base
+
 
 class SpeedTestResult(Base):
     __tablename__ = "speedtests"

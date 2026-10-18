@@ -8,10 +8,10 @@ echo "Pulling pre-built docker image..."
 docker compose pull || true
 
 echo "Stopping existing containers..."
-docker compose down || true
+docker compose down --remove-orphans || true
 
 echo "Starting containers..."
-docker compose up -d
+docker compose up -d --remove-orphans
 
 echo "Pruning old docker images..."
 docker image prune -f

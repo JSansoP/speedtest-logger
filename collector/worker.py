@@ -1,16 +1,25 @@
-import subprocess
 import json
 import logging
+import subprocess
+import threading
 from datetime import datetime
+
 from sqlalchemy.orm import Session
+
 from backend.database import SessionLocal, engine
-from backend.models import SpeedTestResult, AppSettings, Base
+from backend.models import AppSettings, Base, SpeedTestResult
 
 # Ensure tables are created
 Base.metadata.create_all(bind=engine)
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+_run_lock = threading.Lock()
+
+
+def is_running() -> bool:
+    return _run_lock.locked()
 
 def _get_advertised_speeds(db):
     """Read current advertised speeds from AppSettings."""
@@ -54,6 +63,32 @@ def _parse_fast_output(raw_output: str) -> dict:
     raise ValueError(f"No JSON object found in output: {raw_output}")
 
 def run_speedtest():
+    """Runs a speedtest unless one is already in progress."""
+    if not _run_lock.acquire(blocking=False):
+        logger.info("Speedtest already running, skipping.")
+        return None
+    try:
+        return _run_speedtest()
+    finally:
+        _run_lock.release()
+
+
+def start_background_run() -> bool:
+    """Starts a speedtest in a background thread. Returns False if one is already running."""
+    if not _run_lock.acquire(blocking=False):
+        return False
+
+    def run_and_release():
+        try:
+            _run_speedtest()
+        finally:
+            _run_lock.release()
+
+    threading.Thread(target=run_and_release, daemon=True).start()
+    return True
+
+
+def _run_speedtest():
     """
     Executes a speedtest using the fast-cli tool (Fast.com) and logs the result to the DB.
     """

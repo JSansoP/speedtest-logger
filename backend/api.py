@@ -1,15 +1,24 @@
-from flask import Flask, jsonify, request
-from sqlalchemy.orm import Session
-from flasgger import Swagger
-from .database import SessionLocal, engine
-from .models import SpeedTestResult, ReportConfig, AppSettings, Base
-from collector.worker import run_speedtest
-from collector.scheduler import update_speedtest_interval, scheduler
-import threading
 import logging
 import os
+from datetime import UTC, datetime
+from pathlib import Path
 
-app = Flask(__name__)
+from croniter import croniter
+from flasgger import Swagger
+from flask import Flask, jsonify, request, send_from_directory
+from sqlalchemy import func
+from sqlalchemy.orm import Session
+
+from collector.scheduler import scheduler, update_speedtest_interval
+from collector.worker import is_running, start_background_run
+
+from .database import SessionLocal, engine
+from .models import AppSettings, Base, ReportConfig, SpeedTestResult
+
+FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
+DATA_WINDOWS = {"last_day", "last_week", "last_month", "last_3_months", "last_6_months", "last_year"}
+
+app = Flask(__name__, static_folder=None)
 swagger = Swagger(app)
 
 logging.basicConfig(level=logging.INFO)
@@ -19,36 +28,100 @@ logger = logging.getLogger("API")
 Base.metadata.create_all(bind=engine)
 
 
+def to_utc_iso(value: datetime | None) -> str | None:
+    """Serializes a naive UTC datetime as ISO 8601 with an explicit offset."""
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        return value.isoformat() + "+00:00"
+    return value.astimezone(UTC).isoformat()
+
+
+def parse_utc(value: str) -> datetime:
+    """Parses an ISO 8601 string into a naive UTC datetime."""
+    parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    if parsed.tzinfo is not None:
+        parsed = parsed.astimezone(UTC).replace(tzinfo=None)
+    return parsed
+
+
+def next_cron_run(schedule: str, last_run: datetime | None) -> str | None:
+    """Returns the next run time for a report schedule, or None if the schedule is invalid."""
+    if not croniter.is_valid(schedule):
+        return None
+    if last_run is None:
+        return to_utc_iso(datetime.now(UTC))
+    return to_utc_iso(croniter(schedule, last_run).get_next(datetime))
+
+
+def validate_report_payload(data: dict, partial: bool) -> str | None:
+    """Returns an error message if the report payload is invalid."""
+    required = ("name", "schedule", "recipient")
+    if not partial:
+        missing = [key for key in required if not str(data.get(key) or "").strip()]
+        if missing:
+            return f"Missing required fields: {', '.join(missing)}"
+    if "schedule" in data and not croniter.is_valid(str(data["schedule"]).strip()):
+        return f"Invalid cron expression: {data['schedule']}"
+    if "data_window" in data and data["data_window"] not in DATA_WINDOWS:
+        return f"Invalid data window: {data['data_window']}"
+    return None
+
+
+@app.route("/")
+def index():
+    return send_from_directory(FRONTEND_DIR, "index.html")
+
+
+@app.route("/static/<path:filename>")
+def frontend_static(filename):
+    return send_from_directory(FRONTEND_DIR, filename)
+
+
 @app.route("/api/speedtests", methods=["GET"])
 def get_speedtests():
     """
-    Get latest speedtest results
+    Get speedtest results, newest first
     ---
     parameters:
       - name: limit
         in: query
         type: integer
-        description: Number of results to return
+        description: Number of results to return (0 for no limit)
         default: 100
+      - name: since
+        in: query
+        type: string
+        description: Only return results at or after this ISO 8601 timestamp
     responses:
       200:
         description: A list of speedtest results
+      400:
+        description: Invalid since parameter
     """
     db: Session = SessionLocal()
     try:
         limit = request.args.get("limit", default=100, type=int)
-        results = db.query(SpeedTestResult).order_by(SpeedTestResult.timestamp.desc()).limit(limit).all()
+        query = db.query(SpeedTestResult).order_by(SpeedTestResult.timestamp.desc())
+        since = request.args.get("since")
+        if since:
+            try:
+                query = query.filter(SpeedTestResult.timestamp >= parse_utc(since))
+            except ValueError:
+                return jsonify({"error": f"Invalid since timestamp: {since}"}), 400
+        if limit > 0:
+            query = query.limit(limit)
         return jsonify([
             {
                 "id": r.id,
-                "timestamp": r.timestamp.isoformat(),
+                "timestamp": to_utc_iso(r.timestamp),
                 "download": r.download,
                 "upload": r.upload,
                 "ping": r.ping,
                 "server_name": r.server_name,
                 "advertised_download": r.advertised_download,
                 "advertised_upload": r.advertised_upload
-            } for r in results
+            } for r in query.all()
         ])
     finally:
         db.close()
@@ -59,12 +132,40 @@ def trigger_speedtest():
     Trigger a manual speedtest in the background
     ---
     responses:
-      200:
-        description: Speedtest started message
+      202:
+        description: Speedtest started
+      409:
+        description: A speedtest is already running
     """
-    thread = threading.Thread(target=run_speedtest)
-    thread.start()
-    return jsonify({"message": "Speedtest started in background."})
+    if not start_background_run():
+        return jsonify({"error": "A speedtest is already running."}), 409
+    return jsonify({"message": "Speedtest started in background."}), 202
+
+@app.route("/api/status", methods=["GET"])
+def get_status():
+    """
+    Get collector status
+    ---
+    responses:
+      200:
+        description: Whether a test is running, the next scheduled run and result totals
+    """
+    db: Session = SessionLocal()
+    try:
+        total, last_timestamp = db.query(
+            func.count(SpeedTestResult.id), func.max(SpeedTestResult.timestamp)
+        ).one()
+        interval = db.query(AppSettings).filter(AppSettings.key == "speedtest_interval").first()
+        job = scheduler.get_job("speedtest_job")
+        return jsonify({
+            "running": is_running(),
+            "next_run": to_utc_iso(job.next_run_time) if job and job.next_run_time else None,
+            "interval_minutes": int(interval.value) if interval else 60,
+            "total_results": total,
+            "last_result_at": to_utc_iso(last_timestamp),
+        })
+    finally:
+        db.close()
 
 @app.route("/api/history/<int:id>", methods=["DELETE"])
 def delete_speedtest(id):
@@ -122,7 +223,8 @@ def get_reports():
                 "recipient": r.recipient,
                 "data_window": r.data_window or "last_day",
                 "enabled": r.enabled,
-                "last_run": r.last_run.isoformat() if r.last_run else None
+                "last_run": to_utc_iso(r.last_run),
+                "next_run": next_cron_run(r.schedule or "", r.last_run) if r.enabled else None
             } for r in reports
         ])
     finally:
@@ -149,14 +251,19 @@ def create_report():
       201:
         description: Report created successfully
     """
-    data = request.json
+    data = request.get_json(silent=True) or {}
+    error = validate_report_payload(data, partial=False)
+    if error:
+        return jsonify({"error": error}), 400
     db: Session = SessionLocal()
     try:
+        if db.query(ReportConfig).filter(ReportConfig.name == data["name"].strip()).first():
+            return jsonify({"error": f"A report named '{data['name'].strip()}' already exists"}), 409
         new_report = ReportConfig(
-            name=data["name"],
+            name=data["name"].strip(),
             type=data.get("type", "telegram"),
-            schedule=data["schedule"],
-            recipient=data["recipient"],
+            schedule=data["schedule"].strip(),
+            recipient=data["recipient"].strip(),
             data_window=data.get("data_window", "last_day"),
             enabled=data.get("enabled", True)
         )
@@ -175,7 +282,10 @@ def update_report(id):
     """
     Update an existing report configuration
     """
-    data = request.json
+    data = request.get_json(silent=True) or {}
+    error = validate_report_payload(data, partial=True)
+    if error:
+        return jsonify({"error": error}), 400
     db: Session = SessionLocal()
     try:
         report = db.query(ReportConfig).filter(ReportConfig.id == id).first()
@@ -233,15 +343,9 @@ def get_settings():
     try:
         settings = db.query(AppSettings).all()
         data = {s.key: s.value for s in settings}
-        
-        # Overlay environment variables
-        env_token = os.getenv("TELEGRAM_BOT_TOKEN")
-        if env_token:
-            data["telegram_bot_token"] = "___ENVIORNMENT_VARIABLE___"
-            data["has_env_token"] = True
-        else:
-            data["has_env_token"] = False
-            
+        stored_token = data.pop("telegram_bot_token", None)
+        data["has_env_token"] = bool(os.getenv("TELEGRAM_BOT_TOKEN"))
+        data["has_db_token"] = bool(stored_token)
         return jsonify(data)
     finally:
         db.close()
@@ -264,7 +368,20 @@ def update_settings():
       200:
         description: Settings updated successfully
     """
-    data = request.json
+    data = request.get_json(silent=True) or {}
+    if "speedtest_interval" in data:
+        try:
+            if int(data["speedtest_interval"]) < 1:
+                raise ValueError
+        except (TypeError, ValueError):
+            return jsonify({"error": "speedtest_interval must be a positive integer"}), 400
+    for key in ("advertised_download", "advertised_upload"):
+        if key in data:
+            try:
+                if float(data[key]) < 0:
+                    raise ValueError
+            except (TypeError, ValueError):
+                return jsonify({"error": f"{key} must be a non-negative number"}), 400
     db: Session = SessionLocal()
     try:
         updated_keys = []
@@ -307,7 +424,7 @@ def debug_scheduler():
     return jsonify([
         {
             "id": j.id,
-            "next_run_time": j.next_run_time.isoformat() if j.next_run_time else None,
+            "next_run_time": to_utc_iso(j.next_run_time),
             "trigger": str(j.trigger),
             "pending": j.pending
         } for j in jobs

@@ -7,7 +7,7 @@ A fully containerized, automated internet performance monitor with a modern dash
 ## ✨ Features
 
 - **Automated Monitoring**: Scheduled speedtests (from 1 minute to any interval) using `fast-cli` (Fast.com powered by Netflix).
-- **Modern Dashboard**: Dynamic, interactive charts built with **Streamlit** and **Plotly** (Dark Mode included).
+- **Fast Dashboard**: Lightweight web UI served by the backend itself, with plan-vs-actual readouts, interactive charts, light and dark themes, and CSV export.
 - **Professional Reporting**: Modular reporting system with built-in **Telegram** notifications for 24-hour summaries.
 - **Dynamic Configuration**: Change your test intervals directly from the web UI without restarting containers.
 - **Privacy & Security**: Secure management of sensitive tokens using environment variables (`.env`).
@@ -18,7 +18,7 @@ A fully containerized, automated internet performance monitor with a modern dash
 
 - **Language**: [Python 3.14.2+](https://www.python.org/)
 - **Backend API**: [Flask](https://flask.palletsprojects.com/) + [SQLAlchemy](https://www.sqlalchemy.org/)
-- **Frontend**: [Streamlit](https://streamlit.io/) + [Plotly](https://plotly.com/python/)
+- **Frontend**: Plain HTML, CSS and JavaScript (no build step) with [uPlot](https://github.com/leeoniya/uPlot) for charts
 - **Scheduling**: [APScheduler](https://apscheduler.readthedocs.io/)
 - **Package Manager**: [uv](https://github.com/astral-sh/uv) (Extremely fast, deterministic builds)
 - **Containerization**: [Docker](https://www.docker.com/) & [Docker Compose](https://docs.docker.com/compose/)
@@ -52,8 +52,8 @@ Use the included helper script to build and start the services:
 ## 📊 Usage
 
 ### 🖥️ Dashboard
-Access the interactive dashboard at:  
-👉 [**http://localhost:8501**](http://localhost:8501)
+Access the dashboard at:  
+👉 [**http://localhost:5000**](http://localhost:5000)
 
 - **Dashboard**: View latest stats and historical trends.
 - **History**: Browse and sort every recorded speedtest.
@@ -73,7 +73,7 @@ Check the real-time state of the background scheduler:
 ## 📁 Project Structure
 
 ```text
-├── app.py                # Streamlit Dashboard (Frontend)
+├── frontend/             # Web UI (index.html, app.js, app.css, vendored uPlot and font)
 ├── backend/
 │   ├── api.py            # Flask REST API & Swagger UI
 │   ├── database.py       # SQLAlchemy Connection & SQLite
@@ -91,3 +91,10 @@ Check the real-time state of the background scheduler:
 
 ## 📜 License
 This project is provided "as is" for monitoring personal home internet performance. Feel free to fork and expand!
+
+## 🧪 Development
+```powershell
+uv sync
+uv run pytest
+uv run ruff check .
+```
