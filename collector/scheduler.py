@@ -4,12 +4,15 @@ from datetime import datetime
 
 from apscheduler.jobstores.base import JobLookupError
 from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 
 from backend.database import SessionLocal
+from backend.latency import ROUND_SECONDS
 from backend.models import AppSettings
 from reporting.manager import sync_run_reports
 
+from .latency import run_latency_maintenance, run_latency_round
 from .worker import run_speedtest
 
 logging.basicConfig(level=logging.INFO)
@@ -80,6 +83,28 @@ def start_scheduler():
         replace_existing=True,
         misfire_grace_time=30,
         next_run_time=datetime.now() # Check first time immediately
+    )
+
+    scheduler.add_job(
+        run_latency_round,
+        IntervalTrigger(seconds=ROUND_SECONDS),
+        id="latency_job",
+        replace_existing=True,
+        max_instances=1,
+        coalesce=True,
+        misfire_grace_time=30,
+        next_run_time=datetime.now()
+    )
+
+    scheduler.add_job(
+        run_latency_maintenance,
+        CronTrigger(minute=5),
+        id="latency_maintenance_job",
+        replace_existing=True,
+        max_instances=1,
+        coalesce=True,
+        misfire_grace_time=600,
+        next_run_time=datetime.now()
     )
 
     scheduler.start()

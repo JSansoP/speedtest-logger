@@ -23,6 +23,7 @@ def run_migrations():
         migrations = {
             "advertised_download": "ALTER TABLE speedtests ADD COLUMN advertised_download FLOAT",
             "advertised_upload": "ALTER TABLE speedtests ADD COLUMN advertised_upload FLOAT",
+            "loaded_latency": "ALTER TABLE speedtests ADD COLUMN loaded_latency FLOAT",
         }
         with engine.begin() as conn:
             for col_name, ddl in migrations.items():

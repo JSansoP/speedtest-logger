@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from backend.database import SessionLocal, engine
 from backend.models import AppSettings, Base, SpeedTestResult
-from collector import heartbeat
+from collector import heartbeat, probe
 
 # Ensure tables are created
 Base.metadata.create_all(bind=engine)
@@ -97,13 +97,15 @@ def _run_speedtest():
     logger.info("Starting speedtest using fast-cli...")
     try:
         cmd = ["fast", "--upload", "--json"]
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=180,
-            check=False,
-        )
+        with probe.LoadSampler() as load_sampler:
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=180,
+                check=False,
+            )
+        loaded_latency = load_sampler.median
 
         if result.returncode != 0:
             error_msg = result.stderr.strip() or result.stdout.strip()
@@ -133,6 +135,7 @@ def _run_speedtest():
                 server_id=server_id,
                 advertised_download=adv_download,
                 advertised_upload=adv_upload,
+                loaded_latency=loaded_latency,
                 timestamp=datetime.now(UTC).replace(tzinfo=None)
             )
             db.add(new_result)

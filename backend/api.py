@@ -15,13 +15,17 @@ from collector.scheduler import scheduler, update_speedtest_interval
 from collector.worker import is_running, start_background_run
 
 from .database import SessionLocal, engine
+from .latency import SETTING_DEFAULTS, validate_latency_setting
+from .latency_api import bp as latency_bp
 from .models import AppSettings, Base, ReportConfig, SpeedTestResult
+from .timeutil import parse_utc, to_utc_iso
 
 FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
 DATA_WINDOWS = {"last_day", "last_week", "last_month", "last_3_months", "last_6_months", "last_year"}
 
 app = Flask(__name__, static_folder=None)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
+app.register_blueprint(latency_bp)
 swagger = Swagger(app)
 
 logging.basicConfig(level=logging.INFO)
@@ -29,23 +33,6 @@ logger = logging.getLogger("API")
 
 # Ensure tables are created
 Base.metadata.create_all(bind=engine)
-
-
-def to_utc_iso(value: datetime | None) -> str | None:
-    """Serializes a naive UTC datetime as ISO 8601 with an explicit offset."""
-    if value is None:
-        return None
-    if value.tzinfo is None:
-        return value.isoformat() + "+00:00"
-    return value.astimezone(UTC).isoformat()
-
-
-def parse_utc(value: str) -> datetime:
-    """Parses an ISO 8601 string into a naive UTC datetime."""
-    parsed = datetime.fromisoformat(value)
-    if parsed.tzinfo is not None:
-        parsed = parsed.astimezone(UTC).replace(tzinfo=None)
-    return parsed
 
 
 def next_cron_run(schedule: str, last_run: datetime | None) -> str | None:
@@ -123,7 +110,8 @@ def get_speedtests():
                 "ping": r.ping,
                 "server_name": r.server_name,
                 "advertised_download": r.advertised_download,
-                "advertised_upload": r.advertised_upload
+                "advertised_upload": r.advertised_upload,
+                "loaded_latency": r.loaded_latency
             } for r in query.all()
         ])
     finally:
@@ -349,6 +337,10 @@ def get_settings():
         stored_token = data.pop("telegram_bot_token", None)
         data["has_env_token"] = bool(os.getenv("TELEGRAM_BOT_TOKEN"))
         data["has_db_token"] = bool(stored_token)
+        data.pop("latency_targets_seeded", None)
+        data.pop("latency_degradation_last_alert", None)
+        for key, default in SETTING_DEFAULTS.items():
+            data.setdefault(key, default)
         return jsonify(data)
     finally:
         db.close()
@@ -385,6 +377,11 @@ def update_settings():
                     raise ValueError
             except (TypeError, ValueError):
                 return jsonify({"error": f"{key} must be a non-negative number"}), 400
+    for key in SETTING_DEFAULTS:
+        if key in data:
+            error = validate_latency_setting(key, data[key])
+            if error:
+                return jsonify({"error": error}), 400
     db: Session = SessionLocal()
     try:
         updated_keys = []

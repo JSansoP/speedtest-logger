@@ -55,3 +55,29 @@ def test_successful_run_stores_result_in_mbps(monkeypatch):
     assert stored.upload == 50.0
     assert stored.ping == 9.0
     assert stored.timestamp.tzinfo is None
+
+
+def test_successful_run_stores_loaded_latency(monkeypatch):
+    class FakeSampler:
+        median = 42.5
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+    output = '{"downloadSpeed": 10, "downloadUnit": "Mbps", "uploadSpeed": 5, "uploadUnit": "Mbps", "latency": 9}'
+    monkeypatch.setattr(subprocess, "run", fake_run(stdout=output))
+    monkeypatch.setattr(worker.probe, "LoadSampler", FakeSampler)
+    worker.run_speedtest()
+    [stored] = stored_results()
+    assert stored.loaded_latency == 42.5
+
+
+def test_loaded_latency_is_empty_when_probes_fail(monkeypatch):
+    output = '{"downloadSpeed": 10, "downloadUnit": "Mbps", "uploadSpeed": 5, "uploadUnit": "Mbps", "latency": 9}'
+    monkeypatch.setattr(subprocess, "run", fake_run(stdout=output))
+    worker.run_speedtest()
+    [stored] = stored_results()
+    assert stored.loaded_latency is None

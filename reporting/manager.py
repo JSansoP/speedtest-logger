@@ -1,6 +1,5 @@
 import asyncio
 import logging
-import os
 import statistics
 from datetime import UTC, datetime, timedelta
 
@@ -8,8 +7,9 @@ from croniter import croniter
 from sqlalchemy.orm import Session
 
 from backend.database import SessionLocal
-from backend.models import AppSettings, ReportConfig, SpeedTestResult
+from backend.models import ReportConfig, SpeedTestResult
 
+from .alerts import resolve_bot_token
 from .providers.telegram import send_telegram_message
 
 logging.basicConfig(level=logging.INFO)
@@ -126,11 +126,8 @@ async def run_reports():
             
             if report.type == "telegram":
                 # Priority: 1. Environment Variable, 2. Database
-                bot_token = os.getenv("TELEGRAM_BOT_TOKEN")
-                if not bot_token:
-                    token_setting = db.query(AppSettings).filter(AppSettings.key == "telegram_bot_token").first()
-                    bot_token = token_setting.value if token_setting else None
-                
+                bot_token = resolve_bot_token(db)
+
                 if bot_token:
                     await send_telegram_message(bot_token, report.recipient, message)
                     report.last_run = now

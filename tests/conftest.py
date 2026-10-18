@@ -23,3 +23,14 @@ def client():
     app.config["TESTING"] = True
     with app.test_client() as test_client:
         yield test_client
+
+
+@pytest.fixture(autouse=True)
+def no_network_probes(monkeypatch):
+    from collector import probe
+
+    def blocked(*args, **kwargs):
+        raise OSError("network probes are disabled in tests")
+
+    monkeypatch.setattr(probe, "ping", blocked)
+    monkeypatch.setattr(probe, "async_multiping", blocked)

@@ -4,7 +4,8 @@ import threading
 import time
 
 from backend.api import app as flask_app
-from backend.database import Base, engine, run_migrations
+from backend.database import Base, SessionLocal, engine, run_migrations
+from collector.latency import seed_default_targets
 from collector.scheduler import start_scheduler
 
 # Set up logging
@@ -23,6 +24,11 @@ def main():
     Base.metadata.create_all(bind=engine)
     run_migrations()
     logger.info("Database migrations complete.")
+    db = SessionLocal()
+    try:
+        seed_default_targets(db)
+    finally:
+        db.close()
     
     # Start Scheduler in background
     logger.info("Starting Scheduler...")
