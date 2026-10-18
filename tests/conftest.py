@@ -3,6 +3,7 @@ import tempfile
 
 os.environ["DATA_DIR"] = tempfile.mkdtemp(prefix="speedtest-logger-tests-")
 os.environ.pop("TELEGRAM_BOT_TOKEN", None)
+os.environ.pop("HEARTBEAT_URL", None)
 
 import pytest
 

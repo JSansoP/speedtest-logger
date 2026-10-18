@@ -40,6 +40,8 @@ Edit `.env`:
 TELEGRAM_BOT_TOKEN=your_token_from_botfather
 ```
 
+Optional: set `HEARTBEAT_URL` to a [heartbeat-monitor](https://github.com/JSansoP/heartbeat-monitor) ping URL (for example `http://personal-vps/heartbeat/ping/speedtest`). After every speedtest the backend pings it, or `<url>/fail` when the test errors. Pings use a 5 s timeout and failures are only logged, so the speedtest never depends on the monitor.
+
 ### 3. Launch with Docker
 Use the included helper script to build and start the services:
 ```powershell
@@ -88,6 +90,7 @@ Check the real-time state of the background scheduler:
 │   ├── database.py       # SQLAlchemy Connection & SQLite
 │   └── models.py         # Database Schema
 ├── collector/
+│   ├── heartbeat.py      # Optional pings to heartbeat-monitor
 │   ├── scheduler.py      # Background APScheduler Logic
 │   └── worker.py         # Speedtest Execution Logic
 ├── reporting/

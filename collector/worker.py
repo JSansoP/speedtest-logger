@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from backend.database import SessionLocal, engine
 from backend.models import AppSettings, Base, SpeedTestResult
+from collector import heartbeat
 
 # Ensure tables are created
 Base.metadata.create_all(bind=engine)
@@ -138,6 +139,7 @@ def _run_speedtest():
             db.commit()
             db.refresh(new_result)
             logger.info(f"Speedtest result saved: ID={new_result.id}")
+            heartbeat.send()
             return new_result
         except SQLAlchemyError as e:
             logger.error(f"Error saving to database: {e}")
@@ -148,6 +150,7 @@ def _run_speedtest():
 
     except (OSError, RuntimeError, ValueError, subprocess.TimeoutExpired, SQLAlchemyError) as e:
         logger.error(f"Speedtest failed: {e}")
+        heartbeat.send("fail")
         return None
 
 if __name__ == "__main__":

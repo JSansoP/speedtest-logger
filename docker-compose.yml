@@ -11,6 +11,7 @@ services:
     shm_size: '512mb'
     environment:
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - HEARTBEAT_URL=${HEARTBEAT_URL:-}
     restart: unless-stopped
 
 volumes:
