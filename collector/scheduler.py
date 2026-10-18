@@ -2,6 +2,7 @@ import logging
 import time
 from datetime import datetime
 
+from apscheduler.jobstores.base import JobLookupError
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 
@@ -51,7 +52,7 @@ def update_speedtest_interval(minutes: int):
             )
             logger.info("New job created.")
         return True
-    except Exception as e:
+    except (JobLookupError, ValueError) as e:
         logger.error(f"Failed to update interval: {e}")
         return False
 

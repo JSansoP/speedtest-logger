@@ -7,6 +7,7 @@ from croniter import croniter
 from flasgger import Swagger
 from flask import Flask, jsonify, request, send_from_directory
 from sqlalchemy import func
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from collector.scheduler import scheduler, update_speedtest_interval
@@ -39,7 +40,7 @@ def to_utc_iso(value: datetime | None) -> str | None:
 
 def parse_utc(value: str) -> datetime:
     """Parses an ISO 8601 string into a naive UTC datetime."""
-    parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    parsed = datetime.fromisoformat(value)
     if parsed.tzinfo is not None:
         parsed = parsed.astimezone(UTC).replace(tzinfo=None)
     return parsed
@@ -180,7 +181,7 @@ def delete_speedtest(id):
             db.commit()
             return jsonify({"message": f"Deleted record {id}"}), 200
         return jsonify({"error": "Record not found"}), 404
-    except Exception as e:
+    except SQLAlchemyError as e:
         logger.error(f"Error deleting record: {e}")
         return jsonify({"error": str(e)}), 400
     finally:
@@ -196,7 +197,7 @@ def delete_all_speedtests():
         db.query(SpeedTestResult).delete()
         db.commit()
         return jsonify({"message": "All records deleted"}), 200
-    except Exception as e:
+    except SQLAlchemyError as e:
         logger.error(f"Error deleting all records: {e}")
         return jsonify({"error": str(e)}), 400
     finally:
@@ -271,7 +272,7 @@ def create_report():
         db.commit()
         db.refresh(new_report)
         return jsonify({"message": "Report created"}), 201
-    except Exception as e:
+    except SQLAlchemyError as e:
         logger.error(f"Error creating report: {e}")
         return jsonify({"error": str(e)}), 400
     finally:
@@ -304,7 +305,7 @@ def update_report(id):
         
         db.commit()
         return jsonify({"message": f"Report {id} updated"}), 200
-    except Exception as e:
+    except SQLAlchemyError as e:
         logger.error(f"Error updating report: {e}")
         return jsonify({"error": str(e)}), 400
     finally:
@@ -324,7 +325,7 @@ def delete_report(id):
         db.delete(report)
         db.commit()
         return jsonify({"message": f"Report {id} deleted"}), 200
-    except Exception as e:
+    except SQLAlchemyError as e:
         logger.error(f"Error deleting report: {e}")
         return jsonify({"error": str(e)}), 400
     finally:
@@ -405,7 +406,7 @@ def update_settings():
         
         db.commit()
         return jsonify({"message": f"Updated settings: {', '.join(updated_keys)}"}), 200
-    except Exception as e:
+    except SQLAlchemyError as e:
         logger.error(f"Error updating settings: {e}")
         return jsonify({"error": str(e)}), 400
     finally:

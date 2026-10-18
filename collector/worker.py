@@ -2,8 +2,9 @@ import json
 import logging
 import subprocess
 import threading
-from datetime import datetime
+from datetime import UTC, datetime
 
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from backend.database import SessionLocal, engine
@@ -99,7 +100,8 @@ def _run_speedtest():
             cmd,
             capture_output=True,
             text=True,
-            timeout=180
+            timeout=180,
+            check=False,
         )
 
         if result.returncode != 0:
@@ -130,21 +132,21 @@ def _run_speedtest():
                 server_id=server_id,
                 advertised_download=adv_download,
                 advertised_upload=adv_upload,
-                timestamp=datetime.utcnow()
+                timestamp=datetime.now(UTC).replace(tzinfo=None)
             )
             db.add(new_result)
             db.commit()
             db.refresh(new_result)
             logger.info(f"Speedtest result saved: ID={new_result.id}")
             return new_result
-        except Exception as e:
+        except SQLAlchemyError as e:
             logger.error(f"Error saving to database: {e}")
             db.rollback()
             raise
         finally:
             db.close()
 
-    except Exception as e:
+    except (OSError, RuntimeError, ValueError, subprocess.TimeoutExpired, SQLAlchemyError) as e:
         logger.error(f"Speedtest failed: {e}")
         return None
 
