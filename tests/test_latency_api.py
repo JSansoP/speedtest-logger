@@ -134,3 +134,17 @@ def test_speedtests_include_loaded_latency(client):
     assert client.get("/api/speedtests").get_json()[0]["loaded_latency"] == 55.0
 
 
+
+
+def test_outages_listed_newest_first(client):
+    from backend.models import LatencyOutage
+
+    now = utcnow()
+    db = SessionLocal()
+    db.add(LatencyOutage(started_at=now - timedelta(days=2), ended_at=now - timedelta(days=2, minutes=-5), diagnosis="old"))
+    db.add(LatencyOutage(started_at=now - timedelta(hours=1), diagnosis="ongoing"))
+    db.commit()
+    db.close()
+    body = client.get("/api/latency/outages").get_json()
+    assert [o["diagnosis"] for o in body] == ["ongoing", "old"]
+    assert body[0]["ended_at"] is None

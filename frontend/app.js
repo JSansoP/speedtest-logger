@@ -1,3 +1,11 @@
+import {
+  bindTargetsPanel,
+  latencySettingsMarkup,
+  readLatencySettings,
+  renderLatency,
+  targetsPanelMarkup,
+} from "./latency.js";
+
 const API = "api";
 
 const RANGES = [
@@ -370,7 +378,20 @@ function legendValue(u, value, seriesIdx, idx, format) {
 
 /* Router */
 
-const VIEWS = { dashboard: renderDashboard, history: renderHistory, reports: renderReports, settings: renderSettings };
+const VIEWS = {
+  dashboard: renderDashboard,
+  latency: (isCurrent) => renderLatency(latencyContext(), isCurrent),
+  history: renderHistory,
+  reports: renderReports,
+  settings: renderSettings,
+};
+
+function latencyContext() {
+  return {
+    view, state, api, esc, cssVar, toast, ICONS, RANGES, fullFormat, formatWhen, niceCeil,
+    timeAxisValues, legendValue, rangeControl, bindRangeControl, destroyCharts, rangeSince, loadResults,
+  };
+}
 
 function currentView() {
   const name = location.hash.replace(/^#\//, "");
@@ -472,11 +493,13 @@ function stripMarkup(stats, latest, plan, color, format, unit) {
     </figure>`;
 }
 
-function readoutMarkup({ label, colorVar, values, latest, latestTime, plan, unit, format, lowerIsBetter }) {
+function readoutMarkup({ label, colorVar, values, latest, latestTime, plan, unit, format, lowerIsBetter, extra }) {
   const stats = summarize(values);
   const color = cssVar(colorVar);
   let sub;
-  if (plan) {
+  if (extra) {
+    sub = extra;
+  } else if (plan) {
     sub = `Median <strong>${format(stats.median)} ${unit}</strong>, ${formatPct(pctOf(stats.median, plan))} of the ${formatPlan(plan)} ${unit} plan.`;
   } else if (lowerIsBetter) {
     sub = `Median <strong>${format(stats.median)} ${unit}</strong>, worst 10% above ${format(stats.p90)} ${unit}.`;
@@ -490,6 +513,14 @@ function readoutMarkup({ label, colorVar, values, latest, latestTime, plan, unit
       <p class="readout-sub">Latest test ${formatWhen(latestTime)}.<br>${sub}</p>
       ${stripMarkup(stats, latest, plan, color, format, unit)}
     </article>`;
+}
+
+function latencySub(results, pings) {
+  const stats = summarize(pings);
+  const loaded = results.map((r) => r.loaded_latency).filter((v) => v != null);
+  const base = `Median <strong>${formatPing(stats.median)} ms</strong>, worst 10% above ${formatPing(stats.p90)} ms.`;
+  if (!loaded.length) return base;
+  return `${base}<br>Under load median <strong>${formatPing(summarize(loaded).median)} ms</strong>.`;
 }
 
 function statsRow(label, colorVar, values, format, unit, plan, lowerIsBetter) {
@@ -547,7 +578,7 @@ async function renderDashboard(isCurrent) {
     <section class="readouts" aria-label="Current readings">
       ${readoutMarkup({ label: "Download", colorVar: "--dl", values: downloads, latest: latest.download, latestTime: latest.time, plan: planDown, unit: "Mbps", format: formatSpeed })}
       ${readoutMarkup({ label: "Upload", colorVar: "--ul", values: uploads, latest: latest.upload, latestTime: latest.time, plan: planUp, unit: "Mbps", format: formatSpeed })}
-      ${readoutMarkup({ label: "Latency", colorVar: "--ping", values: pings, latest: latest.ping, latestTime: latest.time, plan: null, unit: "ms", format: formatPing, lowerIsBetter: true })}
+      ${readoutMarkup({ label: "Latency", colorVar: "--ping", values: pings, latest: latest.ping, latestTime: latest.time, plan: null, unit: "ms", format: formatPing, lowerIsBetter: true, extra: latencySub(results, pings) })}
       <div class="strip-key" aria-hidden="true">
         <span><i class="key-density"></i>Darker band, more tests at that value</span>
         <span><i class="key-median"></i>Median</span>
@@ -642,6 +673,7 @@ const HISTORY_COLUMNS = [
   { key: "download", label: "Download", unit: "Mbps", value: (r) => r.download, align: "r" },
   { key: "upload", label: "Upload", unit: "Mbps", value: (r) => r.upload, align: "r" },
   { key: "ping", label: "Latency", unit: "ms", value: (r) => r.ping, align: "r" },
+  { key: "loaded", label: "Under load", unit: "ms", value: (r) => r.loaded_latency ?? -1, align: "r" },
   { key: "plan", label: "Download of plan", value: (r) => pctOf(r.download, r.advertised_download) ?? -1 },
   { key: "advertised", label: "Plan", unit: "down / up", value: (r) => r.advertised_download ?? -1, align: "r" },
   { key: "server", label: "Server", value: (r) => r.server_name ?? "" },
@@ -661,7 +693,7 @@ function historyRow(r) {
   if (state.confirmingId === r.id) {
     return `
       <tr class="confirming">
-        <td colspan="7">Delete the test from ${esc(fullFormat.format(r.time))}? This cannot be undone.</td>
+        <td colspan="8">Delete the test from ${esc(fullFormat.format(r.time))}? This cannot be undone.</td>
         <td><div class="row-actions">
           <button class="button ghost" type="button" data-cancel-delete>Cancel</button>
           <button class="button danger solid" type="button" data-confirm-delete="${r.id}">Delete</button>
@@ -674,6 +706,7 @@ function historyRow(r) {
       <td class="r">${formatSpeed(r.download)}</td>
       <td class="r">${formatSpeed(r.upload)}</td>
       <td class="r">${formatPing(r.ping)}</td>
+      <td class="r ${r.loaded_latency == null ? "muted" : ""}">${formatPing(r.loaded_latency)}</td>
       ${pctCell(r)}
       <td class="r ${plan === "–" ? "muted" : ""}">${plan}</td>
       <td class="muted">${esc(r.server_name ?? "")}</td>
@@ -684,9 +717,9 @@ function historyRow(r) {
 }
 
 function exportCsv(rows) {
-  const header = ["timestamp_utc", "download_mbps", "upload_mbps", "ping_ms", "advertised_download_mbps", "advertised_upload_mbps", "server"];
+  const header = ["timestamp_utc", "download_mbps", "upload_mbps", "ping_ms", "loaded_latency_ms", "advertised_download_mbps", "advertised_upload_mbps", "server"];
   const quote = (v) => (v == null ? "" : /[",\n]/.test(String(v)) ? `"${String(v).replace(/"/g, '""')}"` : String(v));
-  const lines = rows.map((r) => [r.timestamp, r.download, r.upload, r.ping, r.advertised_download, r.advertised_upload, r.server_name].map(quote).join(","));
+  const lines = rows.map((r) => [r.timestamp, r.download, r.upload, r.ping, r.loaded_latency, r.advertised_download, r.advertised_upload, r.server_name].map(quote).join(","));
   const blob = new Blob([[header.join(","), ...lines].join("\n")], { type: "text/csv" });
   const link = document.createElement("a");
   link.href = URL.createObjectURL(blob);
@@ -1019,7 +1052,7 @@ function themeChoice() {
 
 async function renderSettings(isCurrent) {
   destroyCharts();
-  const settings = await loadSettings(true);
+  const [settings, targets] = await Promise.all([loadSettings(true), api("/latency/targets")]);
   if (!isCurrent()) return;
   const total = state.status?.total_results ?? 0;
 
@@ -1063,6 +1096,7 @@ async function renderSettings(isCurrent) {
             <span class="hint">Leave empty to hide plan comparisons.</span>
           </div>
         </section>
+        ${latencySettingsMarkup(latencyContext(), settings)}
         <section class="settings-section">
           <div><h2>Telegram</h2><p>The bot that sends your reports.</p></div>
           <div class="settings-fields">${tokenField}</div>
@@ -1072,6 +1106,7 @@ async function renderSettings(isCurrent) {
           <button class="button primary" type="submit">Save settings</button>
         </div>
       </form>
+      ${targetsPanelMarkup(latencyContext(), targets)}
       <section class="panel">
         <div class="settings-section">
           <div><h2>Appearance</h2><p>Stored in this browser only.</p></div>
@@ -1108,6 +1143,7 @@ async function renderSettings(isCurrent) {
       speedtest_interval: interval,
       advertised_download: Number(form.advertised_download.value) || 0,
       advertised_upload: Number(form.advertised_upload.value) || 0,
+      ...readLatencySettings(form),
     };
     const token = form.telegram_bot_token?.value.trim();
     if (token) payload.telegram_bot_token = token;
@@ -1124,6 +1160,8 @@ async function renderSettings(isCurrent) {
       submit.disabled = false;
     }
   });
+
+  bindTargetsPanel(latencyContext(), targets, () => renderSettings(isCurrent));
 
   view.querySelectorAll("[data-theme-choice]").forEach((button) =>
     button.addEventListener("click", () => {
@@ -1147,11 +1185,11 @@ async function renderSettings(isCurrent) {
 /* Boot */
 
 window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
-  if (currentView() === "dashboard") render();
+  if (["dashboard", "latency"].includes(currentView())) render();
 });
 
 new MutationObserver(() => {
-  if (currentView() === "dashboard" && state.results) render();
+  if (["dashboard", "latency"].includes(currentView()) && state.results) render();
 }).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
 
 document.addEventListener("visibilitychange", () => {

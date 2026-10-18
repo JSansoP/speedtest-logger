@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from .database import SessionLocal
 from .latency import LAYERS, build_summary, get_latency_settings
-from .models import LatencyHourly, LatencySample, LatencyTarget
+from .models import LatencyHourly, LatencyOutage, LatencySample, LatencyTarget
 from .timeutil import parse_utc, to_utc_iso
 
 bp = Blueprint("latency", __name__)
@@ -315,5 +315,39 @@ def get_latency_summary():
             "baseline_factor": settings["latency_baseline_factor"],
         }
         return jsonify(summary)
+    finally:
+        db.close()
+
+
+@bp.route("/api/latency/outages", methods=["GET"])
+def get_latency_outages():
+    """
+    Recent internet outages, newest first
+    ---
+    parameters:
+      - name: limit
+        in: query
+        type: integer
+        default: 20
+    responses:
+      200:
+        description: Outages with start, end (null while ongoing), diagnosis text and whether Telegram was told
+    """
+    limit = request.args.get("limit", default=20, type=int)
+    db: Session = SessionLocal()
+    try:
+        rows = db.query(LatencyOutage).order_by(LatencyOutage.started_at.desc()).limit(max(limit, 1)).all()
+        return jsonify(
+            [
+                {
+                    "id": o.id,
+                    "started_at": to_utc_iso(o.started_at),
+                    "ended_at": to_utc_iso(o.ended_at),
+                    "diagnosis": o.diagnosis,
+                    "reported": bool(o.reported),
+                }
+                for o in rows
+            ]
+        )
     finally:
         db.close()
