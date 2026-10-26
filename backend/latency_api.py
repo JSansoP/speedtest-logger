@@ -73,7 +73,7 @@ def create_latency_target():
           properties:
             name: { type: string, example: Router }
             host: { type: string, example: 192.168.50.1 }
-            layer: { type: string, enum: [lan, isp, internet, tailnet] }
+            layer: { type: string, enum: [lan, isp, internet, vpn] }
             enabled: { type: boolean, default: true }
     responses:
       201:

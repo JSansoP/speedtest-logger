@@ -185,7 +185,7 @@ def test_prune_removes_only_old_raw_samples(db, targets):
 
 
 def states(**by_name):
-    layers = {"Router": "lan", "ISP gateway": "isp", "Cloudflare": "internet", "Google": "internet", "VPS": "tailnet"}
+    layers = {"Router": "lan", "ISP gateway": "isp", "Cloudflare": "internet", "Google": "internet", "VPS": "vpn"}
     return [{"name": n, "layer": layers[n], "state": by_name.get(n.replace(" ", "_"), "ok")} for n in layers]
 
 
@@ -215,8 +215,8 @@ def test_diagnosis_single_destination():
     assert result["severity"] == "warning"
 
 
-def test_diagnosis_tailnet_only():
-    assert diagnose(states(VPS="down"))["code"] == "tailnet"
+def test_diagnosis_vpn_only():
+    assert diagnose(states(VPS="down"))["code"] == "vpn"
 
 
 def test_diagnosis_ignores_unknown_targets():
@@ -410,3 +410,17 @@ def test_send_alert_needs_token_and_recipient(db, monkeypatch):
     db.commit()
     assert alerts.send_alert(db, "hi") is True
     assert sent == [("tok", "123", "hi")]
+
+
+def test_migration_renames_tailnet_layer(db):
+    from backend.database import run_migrations
+
+    db.add(LatencyTarget(name="Old VPS", host="10.8.0.1", layer="tailnet", enabled=True))
+    db.add(LatencyTarget(name="Router", host="192.168.50.1", layer="lan", enabled=True))
+    db.commit()
+
+    run_migrations()
+    db.expire_all()
+
+    layers = {t.name: t.layer for t in db.query(LatencyTarget).all()}
+    assert layers == {"Old VPS": "vpn", "Router": "lan"}

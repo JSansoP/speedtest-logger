@@ -46,7 +46,7 @@ class LatencyTarget(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, unique=True)
     host = Column(String)
-    layer = Column(String)  # lan, isp, internet, tailnet
+    layer = Column(String)  # lan, isp, internet, vpn
     enabled = Column(Boolean, default=True)
 
 

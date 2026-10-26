@@ -41,7 +41,7 @@ Edit `.env`:
 TELEGRAM_BOT_TOKEN=your_token_from_botfather
 ```
 
-Optional: set `HEARTBEAT_URL` to a [heartbeat-monitor](https://github.com/JSansoP/heartbeat-monitor) ping URL (for example `http://personal-vps/heartbeat/ping/speedtest`). After every speedtest the backend pings it, or `<url>/fail` when the test errors. Pings use a 5 s timeout and failures are only logged, so the speedtest never depends on the monitor.
+Optional: set `HEARTBEAT_URL` to a [heartbeat-monitor](https://github.com/JSansoP/heartbeat-monitor) ping URL (for example `http://10.8.0.1/heartbeat/ping/speedtest`, the VPS over WireGuard). After every speedtest the backend pings it, or `<url>/fail` when the test errors. Pings use a 5 s timeout and failures are only logged, so the speedtest never depends on the monitor.
 
 ### 3. Launch with Docker
 Use the included helper script to build and start the services:
@@ -65,7 +65,7 @@ Access the dashboard at:
 - **Settings**: Adjust the test frequency (default 60 min), latency thresholds and alerts, and manage the latency targets.
 
 ### 📡 Latency monitor
-Targets are stored in the database and edited in Settings. Defaults, created on first start: Router `192.168.50.1` (LAN), ISP gateway `5.180.229.90` (ISP access), Cloudflare `1.1.1.1` and Google `8.8.8.8` (internet), VPS `100.113.3.127` (tailnet). Change them to match your network. To find your ISP gateway, run a traceroute from the container and pick the first hop beyond the router that answers pings.
+Targets are stored in the database and edited in Settings. Defaults, created on first start: Router `192.168.50.1` (LAN), ISP gateway `5.180.229.90` (ISP access), Cloudflare `1.1.1.1` and Google `8.8.8.8` (internet), VPS `10.8.0.1` (VPN, the WireGuard hub). Change them to match your network. To find your ISP gateway, run a traceroute from the container and pick the first hop beyond the router that answers pings.
 
 - Probing needs raw ICMP sockets: the container runs as root with the default Docker `NET_RAW` capability, nothing else to configure.
 - Raw samples are kept for 90 days, hourly rollups forever.

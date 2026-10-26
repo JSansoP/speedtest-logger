@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from .models import AppSettings, LatencySample, LatencyTarget
 
-LAYERS = ("lan", "isp", "internet", "tailnet")
+LAYERS = ("lan", "isp", "internet", "vpn")
 ROUND_SECONDS = 60
 STALE_AFTER = timedelta(seconds=ROUND_SECONDS * 3)
 
@@ -142,8 +142,8 @@ def diagnose(targets: list[dict]) -> dict:
     elif internet_bad:
         names = ", ".join(t["name"] for t in internet_bad)
         code, text, cause, affected = "destination", f"Only {names}", "that destination only", internet_bad
-    elif bad("tailnet"):
-        code, text, cause, affected = "tailnet", "Tailnet / VPS", "tailnet / VPS", bad("tailnet")
+    elif bad("vpn"):
+        code, text, cause, affected = "vpn", "VPN / VPS", "VPN / VPS", bad("vpn")
     else:
         return {
             "code": "ok",

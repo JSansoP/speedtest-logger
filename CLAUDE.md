@@ -22,10 +22,10 @@ Python 3.14, uv, Flask + SQLAlchemy (SQLite), APScheduler, flasgger (Swagger at 
 - Each round pings every enabled target concurrently: 10 ICMP echoes at 0.5 s with a 2 s timeout. One `latency_samples` row per target per round with sent, received, min, median, avg, max, jitter (mean absolute difference of consecutive RTTs) and `under_load` (a speedtest was running during the round).
 - Tables: `latency_targets`, `latency_samples` (index `(target_id, timestamp)`), `latency_hourly` (min/median/avg/max/p95 of the round medians, loss %, sample count), `latency_outages`. Timestamps are naive UTC like the rest of the DB.
 - The rollup runs hourly instead of daily so ranges over 7 days include recent hours. It only aggregates completed hours that have no rollup yet; pruning deletes raw rows older than 90 days. Hourly rows are kept forever.
-- Default targets are seeded once (flag `latency_targets_seeded` in `app_settings`, so deleting them does not bring them back): Router 192.168.50.1 (lan), ISP gateway 5.180.229.90 (isp), Cloudflare 1.1.1.1 and Google 8.8.8.8 (internet), VPS 100.113.3.127 (tailnet).
+- Default targets are seeded once (flag `latency_targets_seeded` in `app_settings`, so deleting them does not bring them back): Router 192.168.50.1 (lan), ISP gateway 5.180.229.90 (isp), Cloudflare 1.1.1.1 and Google 8.8.8.8 (internet), VPS 10.8.0.1 (vpn, the WireGuard hub). Rows created with the old `tailnet` layer are renamed to `vpn` by `run_migrations()`.
 - The ISP gateway is the first hop beyond the router that answers ICMP echo (found with traceroute on 2026-10-18). The earlier private hops (10.0.90.11 and following) only answer TTL-exceeded and show 100% loss when pinged directly.
 - Target state: `unknown` without a sample in the last 3 minutes, `down` when the latest round lost every packet, `degraded` when loss over the last N rounds exceeds the threshold or the median exceeds baseline times a factor and a minimum absolute excess. Baseline is the 24 h median of unloaded round medians. All thresholds live in `app_settings` (`latency_*` keys, defaults in `backend/latency.py`).
-- Diagnosis (`diagnose`): LAN target bad means LAN/router; else ISP target bad means access line; else all internet targets bad (two or more) means upstream; else some internet target bad means that destination only; else tailnet bad means tailnet/VPS.
+- Diagnosis (`diagnose`): LAN target bad means LAN/router; else ISP target bad means access line; else all internet targets bad (two or more) means upstream; else some internet target bad means that destination only; else vpn bad means VPN/VPS.
 - Outage: N consecutive rounds (`latency_outage_rounds`, default 2) with zero replies on every enabled internet target opens a `latency_outages` row and updates its diagnosis each round. The first round with replies closes it and `report_pending_outages` sends the Telegram message after recovery; unsent outages are retried every round for 24 hours.
 - Degradation alert: loss over `latency_alert_minutes` above `latency_alert_loss_pct` on any target (window at least 80% filled, no open outage) with a global cooldown stored in `app_settings`.
 - Alerts go to the recipients of all enabled Telegram report configs; there is no separate chat setting. Times use `report_timezone` (default Europe/Madrid, needs the `tzdata` package in the slim image).
@@ -36,11 +36,13 @@ Python 3.14, uv, Flask + SQLAlchemy (SQLite), APScheduler, flasgger (Swagger at 
 
 ## Deployment
 
+`HEARTBEAT_URL` uses the VPS WireGuard IP (`http://10.8.0.1/heartbeat/ping/speedtest`), not the `personal-vps` name: the container resolves through Docker DNS and the Pi has no entry for that name.
+
 Docker Compose service `backend` (container `speedtest-backend`, bridge network, port 5000, image `ghcr.io/jsansop/speedtest-logger:latest`, data volume `/app/data`) on the Pi (`sanso@pi-nas`). GitHub Actions builds the image on push to main; `update_and_restart.sh` pulls and restarts it. Served at `http://pi-nas/speedtest/` through OMV nginx (`deploy/nginx/speedtest.conf`, `X-Forwarded-Prefix` with `ProxyFix`); the UI uses relative URLs.
 
 ## Pitfalls
 
-- ICMP needs raw sockets: the container runs as root with the default Docker `NET_RAW`, which works from the bridge network including the tailnet VPS. `ping` and `traceroute` binaries are not installed; use icmplib (`icmplib.traceroute` works).
+- ICMP needs raw sockets: the container runs as root with the default Docker `NET_RAW`, which works from the bridge network including the VPS over WireGuard (Docker masquerades the bridge traffic leaving through `wg0`). `ping` and `traceroute` binaries are not installed; use icmplib (`icmplib.traceroute` works).
 - Never hit the network in tests; `tests/conftest.py` makes any real probe raise.
 - Telegram messages use legacy Markdown: escape user-defined names (`reporting.alerts.escape_markdown`).
 - Change settings only through `/api/settings`; latency keys are validated in `backend/latency.py`.

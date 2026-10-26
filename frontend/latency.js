@@ -1,5 +1,5 @@
 const STATE_LABEL = { ok: "OK", degraded: "Degraded", down: "Down", unknown: "No data" };
-const LAYER_LABEL = { lan: "LAN", isp: "ISP access", internet: "Internet", tailnet: "Tailnet" };
+const LAYER_LABEL = { lan: "LAN", isp: "ISP access", internet: "Internet", vpn: "VPN" };
 const CHART_HEIGHT = 200;
 const RAW_GAP_SECONDS = 180;
 const HOURLY_GAP_SECONDS = 3 * 3600 + 60;
@@ -405,7 +405,7 @@ function targetDialog(ctx, target, onSaved) {
           <select class="input" id="t-layer" name="layer">
             ${Object.entries(LAYER_LABEL).map(([value, label]) => `<option value="${value}" ${value === t.layer ? "selected" : ""}>${label}</option>`).join("")}
           </select>
-          <span class="hint">LAN is your router, ISP access is the first hop beyond it, Internet is far away hosts, Tailnet is a Tailscale peer.</span>
+          <span class="hint">LAN is your router, ISP access is the first hop beyond it, Internet is far away hosts, VPN is a WireGuard peer.</span>
         </div>
         <label class="check"><input type="checkbox" name="enabled" ${t.enabled ? "checked" : ""}>Probe this target</label>
       </div>

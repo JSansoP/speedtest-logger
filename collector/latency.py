@@ -28,7 +28,7 @@ DEFAULT_TARGETS = [
     ("ISP gateway", "5.180.229.90", "isp"),
     ("Cloudflare", "1.1.1.1", "internet"),
     ("Google", "8.8.8.8", "internet"),
-    ("VPS", "100.113.3.127", "tailnet"),
+    ("VPS", "10.8.0.1", "vpn"),
 ]
 
 

@@ -30,6 +30,10 @@ def run_migrations():
                 if col_name not in existing:
                     conn.execute(text(ddl))
 
+    if "latency_targets" in inspector.get_table_names():
+        with engine.begin() as conn:
+            conn.execute(text("UPDATE latency_targets SET layer = 'vpn' WHERE layer = 'tailnet'"))
+
 def get_db():
     db = SessionLocal()
     try:
