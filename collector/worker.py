@@ -32,6 +32,11 @@ def _get_advertised_speeds(db):
         float(adv_up.value) if adv_up and adv_up.value else None,
     )
 
+def _get_isp_name(db) -> str | None:
+    """Read the current ISP name from AppSettings."""
+    setting = db.query(AppSettings).filter(AppSettings.key == "isp_name").first()
+    return setting.value.strip() or None if setting and setting.value else None
+
 def _normalize_to_mbps(speed, unit: str | None) -> float:
     """Normalize speed value to Mbps based on unit string."""
     if speed is None:
@@ -136,6 +141,7 @@ def _run_speedtest():
                 advertised_download=adv_download,
                 advertised_upload=adv_upload,
                 loaded_latency=loaded_latency,
+                isp_name=_get_isp_name(db),
                 timestamp=datetime.now(UTC).replace(tzinfo=None)
             )
             db.add(new_result)

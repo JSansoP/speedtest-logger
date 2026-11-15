@@ -8,6 +8,7 @@ A fully containerized, automated internet performance monitor with a modern dash
 
 - **Automated Monitoring**: Scheduled speedtests (from 1 minute to any interval) using `fast-cli` (Fast.com powered by Netflix).
 - **Latency Monitor**: SmokePing-style probing every minute (ICMP, 10 pings per target) of your router, ISP gateway and internet hosts. Tracks latency, jitter and packet loss, shows latency under load during speedtests, diagnoses where a problem is (LAN, ISP access line, upstream, one destination) and reports outages on Telegram after the connection recovers.
+- **ISP tracking**: Each test records the ISP name set in Settings, so history stays attributable after you switch provider (the first migration labels existing tests `ibred`).
 - **Fast Dashboard**: Lightweight web UI served by the backend itself, with plan-vs-actual readouts, interactive charts, light and dark themes, and CSV export.
 - **Professional Reporting**: Modular reporting system with built-in **Telegram** notifications for 24-hour summaries.
 - **Dynamic Configuration**: Change your test intervals directly from the web UI without restarting containers.

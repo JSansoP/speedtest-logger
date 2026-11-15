@@ -17,6 +17,11 @@ Python 3.14, uv, Flask + SQLAlchemy (SQLite), APScheduler, flasgger (Swagger at 
 - `reporting/manager.py` builds scheduled Telegram reports (includes latency and outage stats). `reporting/alerts.py` sends outage and degradation alerts and resolves the bot token (env first, then DB).
 - Frontend: `frontend/app.js` (router, dashboard, history, reports, settings), `frontend/latency.js` (latency view, target management, latency settings; receives helpers through a context object to avoid circular imports).
 
+## ISP name
+
+- `speedtests.isp_name` stores the ISP in force at test time, like `advertised_download`/`advertised_upload`: the worker copies the `isp_name` setting (`app_settings`) into each new row, so changing the setting never rewrites history.
+- `run_migrations()` adds the column, backfills existing rows with `DEFAULT_ISP_NAME` ("ibred", the ISP at the time of the change) only when the column is first created, and seeds the `isp_name` setting if missing. Validated in `/api/settings` (non-empty string, at most 60 characters, trimmed).
+
 ## Latency monitor design
 
 - Each round pings every enabled target concurrently: 10 ICMP echoes at 0.5 s with a 2 s timeout. One `latency_samples` row per target per round with sent, received, min, median, avg, max, jitter (mean absolute difference of consecutive RTTs) and `under_load` (a speedtest was running during the round).

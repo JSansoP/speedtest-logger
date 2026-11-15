@@ -18,6 +18,7 @@ class SpeedTestResult(Base):
     advertised_download = Column(Float, nullable=True)  # Mbps - ISP promised speed at time of test
     advertised_upload = Column(Float, nullable=True)     # Mbps - ISP promised speed at time of test
     loaded_latency = Column(Float, nullable=True)        # ms - median latency to 1.1.1.1 during the test
+    isp_name = Column(String, nullable=True)             # ISP in force at the time of the test
 
 class ReportConfig(Base):
     __tablename__ = "report_configs"

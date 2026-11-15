@@ -14,6 +14,8 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 Base = declarative_base()
 
+DEFAULT_ISP_NAME = "ibred"
+
 def run_migrations():
     """Add any missing columns to existing tables."""
     inspector = inspect(engine)
@@ -29,6 +31,21 @@ def run_migrations():
             for col_name, ddl in migrations.items():
                 if col_name not in existing:
                     conn.execute(text(ddl))
+            if "isp_name" not in existing:
+                conn.execute(text("ALTER TABLE speedtests ADD COLUMN isp_name VARCHAR"))
+                conn.execute(
+                    text("UPDATE speedtests SET isp_name = :name WHERE isp_name IS NULL"),
+                    {"name": DEFAULT_ISP_NAME},
+                )
+
+    if "app_settings" in inspector.get_table_names():
+        with engine.begin() as conn:
+            has_setting = conn.execute(text("SELECT 1 FROM app_settings WHERE key = 'isp_name'")).first()
+            if not has_setting:
+                conn.execute(
+                    text("INSERT INTO app_settings (key, value) VALUES ('isp_name', :name)"),
+                    {"name": DEFAULT_ISP_NAME},
+                )
 
     if "latency_targets" in inspector.get_table_names():
         with engine.begin() as conn:

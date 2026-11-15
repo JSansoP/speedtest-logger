@@ -676,6 +676,7 @@ const HISTORY_COLUMNS = [
   { key: "loaded", label: "Under load", unit: "ms", value: (r) => r.loaded_latency ?? -1, align: "r" },
   { key: "plan", label: "Download of plan", value: (r) => pctOf(r.download, r.advertised_download) ?? -1 },
   { key: "advertised", label: "Plan", unit: "down / up", value: (r) => r.advertised_download ?? -1, align: "r" },
+  { key: "isp", label: "ISP", value: (r) => r.isp_name ?? "" },
   { key: "server", label: "Server", value: (r) => r.server_name ?? "" },
 ];
 
@@ -693,7 +694,7 @@ function historyRow(r) {
   if (state.confirmingId === r.id) {
     return `
       <tr class="confirming">
-        <td colspan="8">Delete the test from ${esc(fullFormat.format(r.time))}? This cannot be undone.</td>
+        <td colspan="9">Delete the test from ${esc(fullFormat.format(r.time))}? This cannot be undone.</td>
         <td><div class="row-actions">
           <button class="button ghost" type="button" data-cancel-delete>Cancel</button>
           <button class="button danger solid" type="button" data-confirm-delete="${r.id}">Delete</button>
@@ -709,6 +710,7 @@ function historyRow(r) {
       <td class="r ${r.loaded_latency == null ? "muted" : ""}">${formatPing(r.loaded_latency)}</td>
       ${pctCell(r)}
       <td class="r ${plan === "–" ? "muted" : ""}">${plan}</td>
+      <td class="muted">${esc(r.isp_name ?? "")}</td>
       <td class="muted">${esc(r.server_name ?? "")}</td>
       <td><div class="row-actions">
         <button class="button ghost icon-button" type="button" data-delete="${r.id}" aria-label="Delete test from ${esc(fullFormat.format(r.time))}" title="Delete">${ICONS.trash}</button>
@@ -717,9 +719,9 @@ function historyRow(r) {
 }
 
 function exportCsv(rows) {
-  const header = ["timestamp_utc", "download_mbps", "upload_mbps", "ping_ms", "loaded_latency_ms", "advertised_download_mbps", "advertised_upload_mbps", "server"];
+  const header = ["timestamp_utc", "download_mbps", "upload_mbps", "ping_ms", "loaded_latency_ms", "advertised_download_mbps", "advertised_upload_mbps", "isp", "server"];
   const quote = (v) => (v == null ? "" : /[",\n]/.test(String(v)) ? `"${String(v).replace(/"/g, '""')}"` : String(v));
-  const lines = rows.map((r) => [r.timestamp, r.download, r.upload, r.ping, r.loaded_latency, r.advertised_download, r.advertised_upload, r.server_name].map(quote).join(","));
+  const lines = rows.map((r) => [r.timestamp, r.download, r.upload, r.ping, r.loaded_latency, r.advertised_download, r.advertised_upload, r.isp_name, r.server_name].map(quote).join(","));
   const blob = new Blob([[header.join(","), ...lines].join("\n")], { type: "text/csv" });
   const link = document.createElement("a");
   link.href = URL.createObjectURL(blob);
@@ -1081,8 +1083,13 @@ async function renderSettings(isCurrent) {
           </div>
         </section>
         <section class="settings-section">
-          <div><h2>Internet plan</h2><p>The speeds your ISP sells you. Each new test stores the plan in force, so changing it keeps history accurate.</p></div>
+          <div><h2>Internet plan</h2><p>Your ISP and the speeds it sells you. Each new test stores the ISP and plan in force, so changing them keeps history accurate.</p></div>
           <div class="settings-fields">
+            <div class="field">
+              <label for="s-isp">ISP name</label>
+              <input class="input" id="s-isp" name="isp_name" type="text" maxlength="60" required autocomplete="off" value="${esc(settings.isp_name ?? "")}">
+              <span class="hint">Change it when you switch provider. Past tests keep the name they were recorded with.</span>
+            </div>
             <div class="field-row">
               <div class="field">
                 <label for="s-down">Download</label>
@@ -1139,8 +1146,15 @@ async function renderSettings(isCurrent) {
       form.speedtest_interval.focus();
       return;
     }
+    const ispName = form.isp_name.value.trim();
+    if (!ispName) {
+      errorEl.textContent = "ISP name cannot be empty.";
+      form.isp_name.focus();
+      return;
+    }
     const payload = {
       speedtest_interval: interval,
+      isp_name: ispName,
       advertised_download: Number(form.advertised_download.value) || 0,
       advertised_upload: Number(form.advertised_upload.value) || 0,
       ...readLatencySettings(form),

@@ -21,6 +21,7 @@ from .models import AppSettings, Base, ReportConfig, SpeedTestResult
 from .timeutil import parse_utc, to_utc_iso
 
 FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
+MAX_ISP_NAME_LENGTH = 60
 DATA_WINDOWS = {"last_day", "last_week", "last_month", "last_3_months", "last_6_months", "last_year"}
 
 app = Flask(__name__, static_folder=None)
@@ -111,7 +112,8 @@ def get_speedtests():
                 "server_name": r.server_name,
                 "advertised_download": r.advertised_download,
                 "advertised_upload": r.advertised_upload,
-                "loaded_latency": r.loaded_latency
+                "loaded_latency": r.loaded_latency,
+                "isp_name": r.isp_name
             } for r in query.all()
         ])
     finally:
@@ -358,6 +360,7 @@ def update_settings():
           type: object
           properties:
             speedtest_interval: { type: integer, example: 60 }
+            isp_name: { type: string, example: ibred }
             telegram_bot_token: { type: string }
     responses:
       200:
@@ -377,6 +380,11 @@ def update_settings():
                     raise ValueError
             except (TypeError, ValueError):
                 return jsonify({"error": f"{key} must be a non-negative number"}), 400
+    if "isp_name" in data:
+        isp_name = data["isp_name"]
+        if not isinstance(isp_name, str) or not isp_name.strip() or len(isp_name.strip()) > MAX_ISP_NAME_LENGTH:
+            return jsonify({"error": f"isp_name must be a non-empty string of at most {MAX_ISP_NAME_LENGTH} characters"}), 400
+        data["isp_name"] = isp_name.strip()
     for key in SETTING_DEFAULTS:
         if key in data:
             error = validate_latency_setting(key, data[key])
